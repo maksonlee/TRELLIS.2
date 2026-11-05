@@ -32,6 +32,7 @@ python tools/generate_commercial.py \
   --output out/model-1536-seed{seed}.glb \
   --resolution 1536 --seeds 42 \
   --decimation 1000000 --texture 4096 \
+  --save-latent out/model-1536-seed{seed}-latent.npz \
   --result out/model-1536.json
 ```
 
@@ -42,6 +43,8 @@ python tools/generate_commercial.py \
 | `--decimation` | `500000` | target face count (the web app allows 100,000–1,000,000) |
 | `--texture` | `2048` | texture size (the web app allows 1024–4096) |
 | `--texture-format` | `png` | `png` or `webp` |
+| `--save-latent` | none | also keep the result before export (`.npz`), see below; with several seeds the name needs `{seed}` |
+| `--from-latent` | none | export a kept result instead of generating; replaces `--input`, `--resolution` and `--seeds` |
 | `--result` | none | JSON with timings, memory, outputs and the licence audit |
 
 - Exit codes: `0` success; `2` some seeds ran out of GPU memory (each seed fails on its own); `3` licence audit not clean;
@@ -49,6 +52,31 @@ python tools/generate_commercial.py \
 - An existing output file is never overwritten.
 - The two `MALLOC_` variables keep glibc from holding on to freed CPU copies of the model weights. Without them, the
   web app was killed for running out of memory on its second generation (32 GB, no swap).
+
+## Export again with other settings
+
+The face count and texture size are export settings. `to_glb` simplifies the generated mesh to the target, unwraps new
+UVs, and bakes the textures from the generated 3D data. `--save-latent` keeps the result before export: the shape and
+texture latents that the web app keeps between **Generate** and **Extract GLB**. At 1536 the file is about 3.4 MB.
+
+`--from-latent` exports such a file again with other settings. It loads only the two decoders, so it needs no image,
+background removal or DINOv3:
+
+```bash
+MALLOC_MMAP_THRESHOLD_=1048576 MALLOC_ARENA_MAX=2 \
+python tools/generate_commercial.py \
+  --from-latent out/model-1536-seed42-latent.npz \
+  --output out/model-1536-seed42-100k.glb \
+  --decimation 100000 --texture 4096 \
+  --result out/model-1536-100k.json
+```
+
+- The file holds the shape and texture features, their coordinates and the resolution, plus JSON metadata: seed,
+  sampler settings, input image SHA-256, background-removal model and model revision. It is read without pickle.
+- It decodes to the same model only with the same decoders. If the cached `microsoft/TRELLIS.2-4B` revision differs
+  from the one in the file, the export still runs and the result JSON records the difference.
+- Decimating a finished GLB in another tool is not the same. That mesh is split along its UV seams, and the old
+  textures are reused instead of being baked again.
 
 ## Licences of the generation path
 
@@ -84,3 +112,9 @@ test runs the chunk loop of `to_glb` on the UV layouts of existing GLB files:
   therefore cannot be compared pixel by pixel.
 - A 1536 run with 1,000,000 faces and 4096 px PNG textures took 4 min 18 s, and its audit was clean. Blender 5.2
   imported the GLB with the base-colour and metallic-roughness textures connected.
+- With `--save-latent`, a 1536 run (seed 42) wrote a 3,516,178-byte latent. Exports from it decoded to the same raw
+  mesh as the generation, 4,025,468 vertices and 8,081,906 faces.
+  - At 100,000 faces and 4096 px, an export took 57 s with a peak of 4.3 GiB process memory. Generating again took 236 s
+    and 19.5 GiB.
+  - Four 100,000-face GLBs of the same generation had 99,002 to 99,622 faces. Compared with the first, the mean
+    surface distance of each was under 0.01% of the bounding-box diagonal.
