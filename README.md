@@ -1,5 +1,9 @@
 ![](assets/teaser.webp)
 
+> **About this fork:** [`tools/`](tools/README.md) adds a command-line generator for GLB files that uses only components
+> whose licences allow commercial use. It replaces RMBG-2.0 with BiRefNet and nvdiffrast's texture-baking rasterizer
+> with CuMesh's cuBVH. Everything else is unchanged from [microsoft/TRELLIS.2](https://github.com/microsoft/TRELLIS.2).
+
 # Native and Compact Structured Latents for 3D Generation
 
 <a href="https://arxiv.org/abs/2512.14692"><img src="https://img.shields.io/badge/Paper-Arxiv-b31b1b.svg" alt="Paper"></a>
